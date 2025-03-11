@@ -1,114 +1,151 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import { useState } from "react";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+function SplitBill() {
+  const [items, setItems] = useState([{ name: "", price: "", payer: "" }]);
+  const [discount, setDiscount] = useState(null);
+  const [discountType, setDiscountType] = useState("price"); // New state for discount type
+  const [shipping, setShipping] = useState(null);
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+  const addItem = () => {
+    setItems([...items, { name: "", price: "", payer: "" }]);
+  };
 
-export default function Home() {
+  const updateItem = (index, key, value) => {
+    const newItems = [...items];
+    newItems[index][key] = value;
+    setItems(newItems);
+  };
+
+  const total = items.reduce((sum, item) => sum + Number(item.price || 0), 0);
+  const discountValue =
+    discountType === "percent" ? total * (discount / 100) : discount;
+  const finalTotal = total - discountValue + Number(shipping);
+
+  const payments = items.reduce((acc, item) => {
+    if (item.payer) {
+      acc[item.payer] = (acc[item.payer] || 0) + Number(item.price || 0);
+    }
+    return acc;
+  }, {});
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+    }).format(value);
+  };
+
   return (
-    <div
-      className={`${geistSans.variable} ${geistMono.variable} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
-    >
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/pages/index.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <article className="m-12 flex gap-4">
+      <section className="flex flex-col gap-4">
+        <h1 className="text-xl font-bold text-center bg-gray-700 p-4 rounded-xl">
+          Input Bill
+        </h1>
+        <section className="bg-gray-700 p-6 rounded-xl w-fit text-black">
+          <table className="w-full mb-4">
+            <thead className="text-white">
+              <tr>
+                <th className=" bg-gray-800 p-2">Item</th>
+                <th className=" bg-gray-800 p-2">Harga</th>
+                <th className="bg-gray-800 p-2">Nama</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => (
+                <tr key={index}>
+                  <td className="">
+                    <input
+                      type="text"
+                      placeholder="Item"
+                      className="w-full p-2"
+                      value={item.name}
+                      onChange={(e) =>
+                        updateItem(index, "name", e.target.value)
+                      }
+                    />
+                  </td>
+                  <td className="">
+                    <input
+                      type="number"
+                      placeholder="Harga"
+                      className="w-full p-2"
+                      value={item.price}
+                      onChange={(e) =>
+                        updateItem(index, "price", e.target.value)
+                      }
+                    />
+                  </td>
+                  <td className="">
+                    <input
+                      type="text"
+                      placeholder="Nama"
+                      className="w-full p-2"
+                      value={item.payer}
+                      onChange={(e) =>
+                        updateItem(index, "payer", e.target.value)
+                      }
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button
+            onClick={addItem}
+            className="bg-orange-500 text-white px-4 py-2 rounded-md mt-2"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+            Tambah Item
+          </button>
+        </section>
+        <section className="bg-gray-700 p-6 rounded-xl w-full text-black">
+          <div className="mt-4 ">
+            <label className="block text-white">Diskon</label>
+            <select
+              className="border p-2 w-full mb-2"
+              value={discountType}
+              onChange={(e) => setDiscountType(e.target.value)}
+            >
+              <option value="price">Harga (Rp)</option>
+              <option value="percent">Persen (%)</option>
+            </select>
+            <input
+              type="number"
+              className="border p-2 w-full"
+              value={discount}
+              onChange={(e) => setDiscount(e.target.value)}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-white">Ongkir (Rp)</label>
+            <input
+              type="number"
+              placeholder="0"
+              className="border p-2 w-full"
+              value={shipping}
+              onChange={(e) => setShipping(e.target.value)}
+            />
+          </div>
+        </section>
+      </section>
+      <section className="size-full">
+        <h1 className="text-xl font-bold text-center bg-gray-700 p-4 rounded-xl">
+          Preview Split Bill
+        </h1>
+        <h2 className="text-lg font-bold mt-4">
+          Total: {formatCurrency(finalTotal)}
+        </h2>
+        <h3 className="text-md font-semibold mt-2">Pembagian Biaya:</h3>
+        <ul className="list-disc pl-5">
+          {Object.entries(payments).map(([name, amount]) => (
+            <li key={name}>
+              {name}: {formatCurrency((amount / total) * finalTotal)}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </article>
   );
 }
+
+export default SplitBill;
