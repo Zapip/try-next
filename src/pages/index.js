@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
+import Link from "next/link";
 
 function SplitBill() {
   // Fungsi untuk generate hasil split bill dalam format teks
@@ -41,7 +42,7 @@ function SplitBill() {
     const text = getExportText();
     if (navigator.share) {
       navigator.share({
-        title: "Hasil Split Bill",
+        title: "Hasil Split Bill 😊✌🏻",
         text,
       });
     } else {
@@ -49,6 +50,19 @@ function SplitBill() {
     }
   };
   const [items, setItems] = useState([{ name: "", price: "", payer: "" }]);
+  const [payersList, setPayersList] = useState([]);
+  const [newPayer, setNewPayer] = useState("");
+
+  // Reset semua data
+  const handleReset = () => {
+    setItems([{ name: "", price: "", payer: "" }]);
+    setPayersList([]);
+    setNewPayer("");
+    setDiscount(0);
+    setDiscountType("");
+    setShipping(0);
+    setError("");
+  };
   const [discount, setDiscount] = useState(0);
   const [discountType, setDiscountType] = useState("");
   const [shipping, setShipping] = useState(0);
@@ -56,6 +70,23 @@ function SplitBill() {
 
   const addItem = () => {
     setItems([...items, { name: "", price: "", payer: "" }]);
+  };
+
+  // Tambah nama pembayar ke daftar
+  const addPayer = () => {
+    const name = newPayer.trim();
+    if (name && !payersList.includes(name)) {
+      setPayersList([...payersList, name]);
+      setNewPayer("");
+    }
+  };
+
+  const removePayer = (name) => {
+    setPayersList(payersList.filter((p) => p !== name));
+    // Hapus item yang sudah pakai nama ini
+    setItems(
+      items.map((item) => (item.payer === name ? { ...item, payer: "" } : item))
+    );
   };
 
   const removeItem = (index) => {
@@ -154,9 +185,7 @@ function SplitBill() {
   return (
     <>
       <Head>
-        <title>
-          Split Bill  - Buat Pembagian Tagihan Otomatis & Mudah
-        </title>
+        <title>Split Bill - Buat Pembagian Tagihan Otomatis & Mudah</title>
         <meta
           name="description"
           content="Aplikasi split bill modern untuk membagi tagihan, ongkir, pajak, dan diskon secara otomatis. Mudah, cepat, dan bisa export hasil!"
@@ -182,23 +211,78 @@ function SplitBill() {
           <h1 className="text-2xl font-bold text-center bg-gradient-to-r from-orange-400 to-pink-500 text-white p-4 rounded-xl shadow-lg">
             Split Bill
           </h1>
+          {/* Input daftar pembayar */}
+          <section className="bg-white p-6 rounded-xl w-full shadow flex flex-col gap-4 border border-gray-200">
+            <div className="mb-4">
+              <label className="block font-semibold mb-2">
+                Daftar Pembayar
+              </label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  className="p-2 rounded-lg border border-gray-300 text-black w-full"
+                  placeholder="Nama pembayar (misal: Budi)"
+                  value={newPayer}
+                  onChange={(e) => setNewPayer(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addPayer();
+                  }}
+                />
+                <button
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-bold"
+                  onClick={addPayer}
+                  type="button"
+                  disabled={
+                    !newPayer.trim() || payersList.includes(newPayer.trim())
+                  }
+                >
+                  Tambah
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {payersList.map((name) => (
+                  <span
+                    key={name}
+                    className="bg-gray-200 text-black px-3 py-1 rounded-full flex items-center gap-1"
+                  >
+                    {name}
+                    <button
+                      className="ml-1 text-red-500 hover:text-red-700 font-bold"
+                      onClick={() => removePayer(name)}
+                      title="Hapus"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+          {/* Input item pesanan */}
           <section className="bg-white p-6 rounded-xl w-full shadow flex flex-col gap-4 border border-gray-200">
             {items.map((item, index) => (
               <div key={index} className="flex flex-col gap-2 relative group">
                 <section className="flex gap-2">
+                  <select
+                    className="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-400 text-black"
+                    value={item.payer}
+                    onChange={(e) => updateItem(index, "payer", e.target.value)}
+                    disabled={payersList.length === 0}
+                  >
+                    <option value="">Pilih Pembayar</option>
+                    {payersList.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     placeholder="Nama Item (misal: Ayam Goreng)"
                     className="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-400 text-black"
                     value={item.name}
                     onChange={(e) => updateItem(index, "name", e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Nama Pembayar (misal: Budi)"
-                    className="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-400 text-black"
-                    value={item.payer}
-                    onChange={(e) => updateItem(index, "payer", e.target.value)}
+                    disabled={!item.payer}
                   />
                   <button
                     className="ml-2 bg-red-500 text-white hover:bg-red-600 font-bold text-lg px-2 rounded"
@@ -216,6 +300,7 @@ function SplitBill() {
                   className="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-400 text-black"
                   value={toCurrency(item.price)}
                   onChange={(e) => updateItem(index, "price", e.target.value)}
+                  disabled={!item.payer}
                 />
               </div>
             ))}
@@ -324,12 +409,28 @@ function SplitBill() {
               >
                 Share
               </button>
+              <button
+                onClick={handleReset}
+                className=" bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded font-bold self-end"
+                type="button"
+              >
+                Reset Semua Data
+              </button>
             </div>
           </section>
         </section>
-        <footer className="mt-8 text-center text-gray-500 text-sm">
-          Dibuat dengan ❤️ oleh{" "}
-          <span className="font-bold text-orange-500">Zapip</span>
+        <footer className="mt-8 text-gray-500 text-sm flex flex-col items-center gap-2">
+          <section>
+            Dibuat dengan ❤️ oleh{" "}
+            <Link
+              href="https://github.com/zapip"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-orange-500"
+            >
+              Zapip
+            </Link>
+          </section>
         </footer>
       </article>
     </>
