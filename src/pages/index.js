@@ -1,438 +1,534 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Head from "next/head";
-import Link from "next/link";
+import BrandMark from "@/components/BrandMark";
+import ItemRow from "@/components/ItemRow";
+import Panel from "@/components/Panel";
+import PlayerAvatar from "@/components/PlayerAvatar";
+import ResultPanel from "@/components/ResultPanel";
+import { getPlayerColor } from "@/lib/playerColors";
+
+const currencyFormatter = new Intl.NumberFormat("id-ID", {
+  style: "currency",
+  currency: "IDR",
+  minimumFractionDigits: 0,
+});
+
+const onlyNumber = (value) => String(value ?? "").replace(/[^\d]/g, "");
+
+const formatCurrency = (value) =>
+  currencyFormatter.format(Math.round(Number(value) || 0));
 
 function SplitBill() {
-  // Fungsi untuk generate hasil split bill dalam format teks
-  const getExportText = () => {
-    let text = `Hasil Split Bill\n\n`;
-    text += `Total: ${formatCurrency(finalTotal)}\n`;
-    if (discountType && Number(discount) > 0) {
-      text += `Diskon: ${
-        discountType === "percent" ? discount + "%" : formatCurrency(discount)
-      }\n`;
-    }
-    if (shippingValue > 0) {
-      text += `Biaya Tambahan: ${formatCurrency(shippingValue)}\n`;
-    }
-    text += `\nPembagian:\n`;
-    payers.forEach((key) => {
-      text += `- ${payerDisplayNames[key]}: ${formatCurrency(
-        (payments[key] / total) * (finalTotal - shippingValue) +
-          shippingPerPayer
-      )}\n`;
-    });
-    return text;
-  };
-
-  // Export ke clipboard
-  const handleExport = () => {
-    const text = getExportText();
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      alert("Hasil split bill berhasil disalin ke clipboard!");
-    } else {
-      // fallback lama
-      window.prompt("Salin hasil berikut:", text);
-    }
-  };
-
-  // Share via Web Share API
-  const handleShare = () => {
-    const text = getExportText();
-    if (navigator.share) {
-      navigator.share({
-        title: "Hasil Split Bill 😊✌🏻",
-        text,
-      });
-    } else {
-      alert("Fitur share tidak didukung di browser ini.");
-    }
-  };
   const [items, setItems] = useState([{ name: "", price: "", payer: "" }]);
   const [payersList, setPayersList] = useState([]);
   const [newPayer, setNewPayer] = useState("");
+  const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState("");
+  const [shipping, setShipping] = useState(0);
+  const [status, setStatus] = useState(null);
+  const [resetPending, setResetPending] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const confettiTimer = useRef(null);
 
-  // Reset semua data
-  const handleReset = () => {
+  useEffect(() => {
+    return () => {
+      if (confettiTimer.current) clearTimeout(confettiTimer.current);
+    };
+  }, []);
+
+  const total = items.reduce((sum, item) => sum + Number(item.price || 0), 0);
+  const discountValue = !discountType
+    ? 0
+    : discountType === "percent"
+      ? total * (Number(discount) / 100)
+      : Number(discount) || 0;
+  const shippingValue = Number(shipping) || 0;
+  const finalTotal = Math.max(0, total - discountValue + shippingValue);
+
+  const payments = {};
+  items.forEach((item) => {
+    if (item.payer) {
+      const key = item.payer.trim().toLowerCase();
+      payments[key] = (payments[key] || 0) + Number(item.price || 0);
+    }
+  });
+
+  const activePayers = payersList
+    .map((name, index) => ({
+      key: name.trim().toLowerCase(),
+      name: name.trim(),
+      color: getPlayerColor(index),
+    }))
+    .filter((payer) =>
+      Object.prototype.hasOwnProperty.call(payments, payer.key)
+    );
+
+  const shippingPerPayer =
+    activePayers.length > 0 ? shippingValue / activePayers.length : 0;
+  const distributable = Math.max(0, finalTotal - shippingValue);
+
+  const payerShares = activePayers.map((payer) => {
+    const base = total > 0 ? (payments[payer.key] / total) * distributable : 0;
+    const amount = base + shippingPerPayer;
+    const percent =
+      finalTotal > 0
+        ? Math.min(100, Math.max(0, (amount / finalTotal) * 100))
+        : 0;
+
+    return { ...payer, amount, percent };
+  });
+
+  const hasIncompleteItem = items.some((item) => {
+    const hasData = Boolean(item.name.trim() || item.price || item.payer);
+    return hasData && (!item.name.trim() || !item.payer || !item.price);
+  });
+  const validationError = hasIncompleteItem
+    ? "Lengkapi nama item, harga, dan pembayar."
+    : "";
+
+  const emptyMessage =
+    payersList.length === 0
+      ? "Tambahkan teman dulu, lalu isi item dan pembayar."
+      : "Isi minimal satu item dan pilih pembayar.";
+
+  const trimmedNewPayer = newPayer.trim();
+  const isDuplicatePayer =
+    trimmedNewPayer.length > 0 &&
+    payersList.some(
+      (name) => name.toLowerCase() === trimmedNewPayer.toLowerCase()
+    );
+
+  const payerColorMap = new Map(
+    payersList.map((name, index) => [name, getPlayerColor(index)])
+  );
+
+  const discountDisplay = !discountType
+    ? ""
+    : discountType === "percent"
+      ? discount
+      : discount
+        ? formatCurrency(discount)
+        : "";
+
+  const addPayer = () => {
+    if (!trimmedNewPayer) return;
+
+    if (isDuplicatePayer) {
+      setStatus({ type: "error", message: "Nama itu sudah ada di daftar." });
+      return;
+    }
+
+    setPayersList((current) => [...current, trimmedNewPayer]);
+    setNewPayer("");
+    setStatus(null);
+  };
+
+  const removePayer = (name) => {
+    setPayersList((current) => current.filter((payer) => payer !== name));
+    setItems((current) =>
+      current.map((item) =>
+        item.payer === name ? { ...item, payer: "" } : item
+      )
+    );
+    setStatus(null);
+  };
+
+  const addItem = () => {
+    setItems((current) => [
+      ...current,
+      { name: "", price: "", payer: "" },
+    ]);
+  };
+
+  const removeItem = (index) => {
+    setItems((current) =>
+      current.length === 1
+        ? current
+        : current.filter((_, itemIndex) => itemIndex !== index)
+    );
+  };
+
+  const updateItem = (index, key, value) => {
+    setItems((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, [key]: key === "price" ? onlyNumber(value) : value }
+          : item
+      )
+    );
+    setStatus(null);
+  };
+
+  const handleNewPayerChange = (value) => {
+    setNewPayer(value);
+    if (status) setStatus(null);
+  };
+
+  const getExportText = () => {
+    const lines = [
+      "Hasil Split Bill",
+      "",
+      `Total: ${formatCurrency(finalTotal)}`,
+    ];
+
+    if (discountValue > 0) {
+      lines.push(
+        `Diskon: ${
+          discountType === "percent"
+            ? `${discount}%`
+            : formatCurrency(discountValue)
+        }`
+      );
+    }
+
+    if (shippingValue > 0) {
+      lines.push(`Biaya tambahan: ${formatCurrency(shippingValue)}`);
+    }
+
+    lines.push("", "Pembagian:");
+    payerShares.forEach((payer) => {
+      lines.push(`- ${payer.name}: ${formatCurrency(payer.amount)}`);
+    });
+
+    return lines.join("\n");
+  };
+
+  const handleCopy = async () => {
+    if (validationError || payerShares.length === 0) return;
+
+    const text = getExportText();
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        window.prompt("Salin rincian berikut:", text);
+        return;
+      }
+
+      await navigator.clipboard.writeText(text);
+      setStatus({ type: "success", message: "Rincian disalin." });
+      setShowConfetti(true);
+
+      if (confettiTimer.current) clearTimeout(confettiTimer.current);
+      confettiTimer.current = setTimeout(() => setShowConfetti(false), 1000);
+    } catch {
+      setStatus({ type: "error", message: "Gagal menyalin. Coba lagi." });
+    }
+  };
+
+  const handleShare = async () => {
+    if (validationError || payerShares.length === 0) return;
+
+    if (!navigator.share) {
+      setStatus({
+        type: "error",
+        message: "Browser ini belum mendukung bagikan. Salin rincian saja.",
+      });
+      return;
+    }
+
+    try {
+      await navigator.share({
+        title: "Hasil Split Bill",
+        text: getExportText(),
+      });
+      setStatus({ type: "success", message: "Rincian dibagikan." });
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      setStatus({
+        type: "error",
+        message: "Gagal membagikan. Coba salin rincian.",
+      });
+    }
+  };
+
+  const requestReset = () => {
+    setResetPending(true);
+    setStatus(null);
+  };
+
+  const cancelReset = () => {
+    setResetPending(false);
+  };
+
+  const confirmReset = () => {
     setItems([{ name: "", price: "", payer: "" }]);
     setPayersList([]);
     setNewPayer("");
     setDiscount(0);
     setDiscountType("");
     setShipping(0);
-    setError("");
-  };
-  const [discount, setDiscount] = useState(0);
-  const [discountType, setDiscountType] = useState("");
-  const [shipping, setShipping] = useState(0);
-  const [error, setError] = useState("");
-
-  const addItem = () => {
-    setItems([...items, { name: "", price: "", payer: "" }]);
-  };
-
-  // Tambah nama pembayar ke daftar
-  const addPayer = () => {
-    const name = newPayer.trim();
-    if (name && !payersList.includes(name)) {
-      setPayersList([...payersList, name]);
-      setNewPayer("");
-    }
-  };
-
-  const removePayer = (name) => {
-    setPayersList(payersList.filter((p) => p !== name));
-    // Hapus item yang sudah pakai nama ini
-    setItems(
-      items.map((item) => (item.payer === name ? { ...item, payer: "" } : item))
-    );
-  };
-
-  const removeItem = (index) => {
-    if (items.length === 1) return;
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  // Format dan unformat currency
-  const toCurrency = (value) => {
-    if (!value) return "";
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(Number(value));
-  };
-  const onlyNumber = (value) => value.replace(/[^\d]/g, "");
-
-  const updateItem = (index, key, value) => {
-    const newItems = [...items];
-    if (key === "price") {
-      newItems[index][key] = onlyNumber(value);
-    } else {
-      newItems[index][key] = value;
-    }
-    setItems(newItems);
-  };
-
-  // Validasi input hanya saat aksi
-  const validate = () => {
-    for (const item of items) {
-      if (!item.name || !item.payer || !item.price) {
-        return "Semua kolom item harus diisi!";
-      }
-      if (Number(item.price) < 0) {
-        return "Harga tidak boleh negatif!";
-      }
-    }
-    return "";
-  };
-
-  // Jalankan validasi setiap kali items berubah
-  useEffect(() => {
-    setError(validate());
-    // eslint-disable-next-line
-  }, [items, discount, discountType, shipping]);
-
-  const total = items.reduce((sum, item) => sum + Number(item.price || 0), 0);
-  const discountValue =
-    discountType === "percent"
-      ? total * (Number(discount) / 100)
-      : Number(discount);
-  const shippingValue = Number(shipping) || 0;
-  const finalTotal = Math.max(0, total - discountValue + shippingValue);
-
-  // Hitung total per orang (case-insensitive, simpan nama asli pertama)
-  const payments = {};
-  const payerDisplayNames = {};
-  items.forEach((item) => {
-    if (item.payer) {
-      const key = item.payer.trim().toLowerCase();
-      if (!payerDisplayNames[key]) {
-        payerDisplayNames[key] = item.payer.trim();
-      }
-      payments[key] = (payments[key] || 0) + Number(item.price || 0);
-    }
-  });
-
-  // Bagi ongkir rata ke semua orang
-  const payers = Object.keys(payments).filter((name) => name.trim() !== "");
-  const shippingPerPayer =
-    payers.length > 0 ? shippingValue / payers.length : 0;
-
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(Math.round(value));
-  };
-
-  const getRandomColor = () => {
-    const colors = [
-      "bg-red-500",
-      "bg-green-500",
-      "bg-blue-500",
-      "bg-yellow-500",
-      "bg-purple-500",
-      "bg-pink-500",
-      "bg-cyan-500",
-      "bg-indigo-500",
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
+    setResetPending(false);
+    setShowConfetti(false);
+    setStatus({ type: "success", message: "Data dikosongkan." });
   };
 
   return (
     <>
       <Head>
-        <title>Split Bill - Buat Pembagian Tagihan Otomatis & Mudah</title>
+        <title>Split Bill: Bagi Tagihan, Ongkir, dan Diskon</title>
         <meta
           name="description"
-          content="Aplikasi split bill modern untuk membagi tagihan, ongkir, pajak, dan diskon secara otomatis. Mudah, cepat, dan bisa export hasil!"
-        />
-        <meta
-          name="keywords"
-          content="split bill, aplikasi split bill, bagi tagihan, patungan, pembagian biaya, export hasil, zapip"
+          content="Bagi item, ongkir, dan diskon ke tiap orang. Hasilnya bisa disalin atau dibagikan."
         />
         <meta
           property="og:title"
-          content="Split Bill Modern - Buat Pembagian Tagihan Otomatis & Mudah"
+          content="Split Bill: Bagi Tagihan, Ongkir, dan Diskon"
         />
         <meta
           property="og:description"
-          content="Aplikasi split bill modern untuk membagi tagihan, ongkir, pajak, dan diskon secara otomatis. Mudah, cepat, dan bisa export hasil!"
+          content="Bagi item, ongkir, dan diskon ke tiap orang. Hasilnya bisa disalin atau dibagikan."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="/favicon.ico" />
-        <meta property="og:url" content="https://your-domain.com" />
       </Head>
-      <article className="flex flex-col sm:flex-row m-4 sm:m-12 gap-4">
-        <section className="flex flex-col w-full gap-4">
-          <h1 className="text-2xl font-bold text-center bg-gradient-to-r from-orange-400 to-pink-500 text-white p-4 rounded-xl shadow-lg">
-            Split Bill
-          </h1>
-          {/* Input daftar pembayar */}
-          <section className="bg-white p-6 rounded-xl w-full shadow flex flex-col gap-4 border border-gray-200">
-            <div className="mb-4">
-              <label className="block font-semibold mb-2">
-                Daftar Pembayar
-              </label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  className="p-2 rounded-lg border border-gray-300 text-black w-full"
-                  placeholder="Nama pembayar (misal: Budi)"
-                  value={newPayer}
-                  onChange={(e) => setNewPayer(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") addPayer();
-                  }}
-                />
+
+      <div className="page-shell">
+        <BrandMark />
+
+        <main className="tool-grid">
+          <div className="flex flex-col gap-5">
+            <Panel
+              step="01"
+              title="Pembayar"
+              description="Tambahkan teman yang ikut patungan."
+            >
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <div>
+                  <label htmlFor="new-payer" className="field-label">
+                    Nama teman
+                  </label>
+                  <input
+                    id="new-payer"
+                    type="text"
+                    className="field"
+                    placeholder="Tulis nama teman"
+                    value={newPayer}
+                    onChange={(event) =>
+                      handleNewPayerChange(event.target.value)
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addPayer();
+                      }
+                    }}
+                    autoComplete="off"
+                  />
+                </div>
                 <button
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-bold"
-                  onClick={addPayer}
                   type="button"
-                  disabled={
-                    !newPayer.trim() || payersList.includes(newPayer.trim())
-                  }
+                  className="btn btn-secondary w-full sm:w-auto"
+                  onClick={addPayer}
+                  disabled={!trimmedNewPayer || isDuplicatePayer}
                 >
-                  Tambah
+                  Tambah teman
                 </button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {payersList.map((name) => (
-                  <span
-                    key={name}
-                    className="bg-gray-200 text-black px-3 py-1 rounded-full flex items-center gap-1"
-                  >
-                    {name}
-                    <button
-                      className="ml-1 text-red-500 hover:text-red-700 font-bold"
-                      onClick={() => removePayer(name)}
-                      title="Hapus"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          </section>
-          {/* Input item pesanan */}
-          <section className="bg-white p-6 rounded-xl w-full shadow flex flex-col gap-4 border border-gray-200">
-            {items.map((item, index) => (
-              <div key={index} className="flex flex-col gap-2 relative group">
-                <section className="flex gap-2">
-                  <select
-                    className="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-400 text-black"
-                    value={item.payer}
-                    onChange={(e) => updateItem(index, "payer", e.target.value)}
-                    disabled={payersList.length === 0}
-                  >
-                    <option value="">Pilih Pembayar</option>
-                    {payersList.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Nama Item (misal: Ayam Goreng)"
-                    className="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-400 text-black"
-                    value={item.name}
-                    onChange={(e) => updateItem(index, "name", e.target.value)}
-                    disabled={!item.payer}
-                  />
-                  <button
-                    className="ml-2 bg-red-500 text-white hover:bg-red-600 font-bold text-lg px-2 rounded"
-                    title="Hapus Item"
-                    onClick={() => removeItem(index)}
-                    disabled={items.length === 1}
-                  >
-                    Hapus
-                  </button>
-                </section>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Harga (misal: 15.000)"
-                  className="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-400 text-black"
-                  value={toCurrency(item.price)}
-                  onChange={(e) => updateItem(index, "price", e.target.value)}
-                  disabled={!item.payer}
-                />
-              </div>
-            ))}
-            <button
-              onClick={addItem}
-              className="bg-gradient-to-r from-orange-400 to-pink-500 hover:from-orange-500 hover:to-pink-600 text-white px-4 py-2 rounded-md mt-2 font-bold shadow"
-            >
-              + Tambah Item
-            </button>
-            {error && (
-              <div className="text-red-600 font-semibold text-center mt-2">
-                {error}
-              </div>
-            )}
-          </section>
-          <section className="bg-white p-6 rounded-xl w-full shadow border border-gray-200">
-            <div className="mt-4 w-full flex flex-col gap-2">
-              <label className="text-gray-700 font-semibold">Diskon</label>
-              <select
-                className="text-black border p-2 w-full mb-2 rounded-lg focus:ring-2 focus:ring-orange-400"
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value)}
-              >
-                <option value="" disabled>
-                  Pilih Jenis Diskon
-                </option>
-                <option value="price">Harga (Rp)</option>
-                <option value="percent">Persen (%)</option>
-              </select>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder={
-                  discountType === "percent" ? "Diskon (%)" : "Diskon (Rp)"
-                }
-                className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-orange-400 text-black"
-                value={
-                  discountType === "percent" ? discount : toCurrency(discount)
-                }
-                min={0}
-                onChange={(e) => {
-                  if (discountType === "percent") {
-                    setDiscount(onlyNumber(e.target.value));
-                  } else {
-                    setDiscount(onlyNumber(e.target.value));
-                  }
-                }}
-                disabled={!discountType}
-              />
-            </div>
 
-            <div className="mt-4 flex flex-col gap-2">
-              <label className="text-gray-700 font-semibold">
-                Biaya Tambahan (Rp)
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="Biaya tambahan (ongkir, pajak, dll)"
-                className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-orange-400 text-black"
-                value={toCurrency(shipping)}
-                min={0}
-                onChange={(e) => setShipping(onlyNumber(e.target.value))}
-              />
-            </div>
-          </section>
-        </section>
-        <section className="size-full flex flex-col gap-4">
-          <h1 className="text-2xl font-bold text-center bg-gradient-to-r from-green-400 to-blue-500 text-white p-4 rounded-xl shadow-lg">
-            Hasil Split Bill
-          </h1>
-          <h2 className="text-lg font-bold bg-green-500 p-4 rounded-xl text-white shadow">
-            Total: {formatCurrency(finalTotal)}
-          </h2>
-          <section className="bg-white p-6 rounded-xl w-full flex flex-col gap-3 shadow border border-gray-200">
-            <h3 className="text-md font-semibold mt-2 text-gray-700">
-              Pembagian Biaya (sudah termasuk ongkir):
-            </h3>
-            <section className="flex flex-wrap gap-2 justify-start">
-              {!error &&
-                payers.map((key) => (
-                  <section
-                    className={`w-fit h-fit p-2 px-4 rounded-lg text-white font-semibold shadow ${getRandomColor()}`}
-                    key={key}
+              {isDuplicatePayer ? (
+                <p className="mt-2 text-sm font-semibold text-coral-ink">
+                  Nama itu sudah ada.
+                </p>
+              ) : null}
+
+              <div className="mt-4">
+                {payersList.length === 0 ? (
+                  <p className="empty-inline">
+                    Belum ada teman. Tambahkan satu nama untuk mulai.
+                  </p>
+                ) : (
+                  <ul
+                    className="flex flex-wrap gap-2"
+                    aria-label="Daftar pembayar"
                   >
-                    {`${payerDisplayNames[key]}: `}
-                    <span className="font-bold">
-                      {formatCurrency(
-                        (payments[key] / total) * (finalTotal - shippingValue) +
-                          shippingPerPayer
-                      )}
-                    </span>
-                  </section>
+                    {payersList.map((name, index) => (
+                      <li key={name}>
+                        <span className="player-chip">
+                          <PlayerAvatar
+                            name={name}
+                            color={getPlayerColor(index)}
+                          />
+                          <span className="max-w-[12rem] truncate font-bold text-ink">
+                            {name}
+                          </span>
+                          <button
+                            type="button"
+                            className="chip-remove"
+                            onClick={() => removePayer(name)}
+                            aria-label={`Hapus ${name}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Panel>
+
+            <Panel
+              step="02"
+              title="Item"
+              description="Pilih pembayar tiap item. Ongkir dibagi rata ke pembayar yang punya item."
+            >
+              {payersList.length === 0 ? (
+                <p className="mb-4 rounded-md bg-gold/15 px-3 py-2 text-sm font-semibold text-ink">
+                  Tambahkan teman dulu supaya item bisa diberi pembayar.
+                </p>
+              ) : null}
+
+              <div className="flex flex-col gap-4">
+                {items.map((item, index) => (
+                  <ItemRow
+                    key={index}
+                    item={item}
+                    index={index}
+                    payers={payersList}
+                    payerColor={
+                      item.payer
+                        ? payerColorMap.get(item.payer)
+                        : "#FFD23F"
+                    }
+                    canRemove={items.length > 1}
+                    formatCurrency={formatCurrency}
+                    onChange={updateItem}
+                    onRemove={removeItem}
+                  />
                 ))}
-            </section>
-            <div className="flex gap-2 justify-start mt-4">
+              </div>
+
               <button
-                onClick={handleExport}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded font-bold shadow"
-              >
-                Export/Salin Hasil
-              </button>
-              <button
-                onClick={handleShare}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-bold shadow"
-              >
-                Share
-              </button>
-              <button
-                onClick={handleReset}
-                className=" bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded font-bold self-end"
                 type="button"
+                className="btn btn-secondary mt-4 w-full sm:w-auto"
+                onClick={addItem}
               >
-                Reset Semua Data
+                Tambah item
               </button>
-            </div>
-          </section>
-        </section>
-        <footer className="mt-8 text-gray-500 text-sm flex flex-col items-center gap-2">
-          <section>
-            Dibuat dengan ❤️ oleh{" "}
-            <Link
+
+              {validationError ? (
+                <p role="alert" className="status status-error mt-3">
+                  {validationError}
+                </p>
+              ) : null}
+            </Panel>
+
+            <Panel
+              step="03"
+              title="Diskon dan biaya tambahan"
+              description="Diskon mengurangi subtotal. Biaya tambahan dibagi rata."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="discount-type" className="field-label">
+                    Jenis diskon
+                  </label>
+                  <select
+                    id="discount-type"
+                    className="field"
+                    value={discountType}
+                    onChange={(event) => {
+                      setDiscountType(event.target.value);
+                      setStatus(null);
+                    }}
+                  >
+                    <option value="">Tanpa diskon</option>
+                    <option value="price">Nominal (Rp)</option>
+                    <option value="percent">Persen (%)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="discount-value" className="field-label">
+                    Nilai diskon
+                  </label>
+                  <input
+                    id="discount-value"
+                    type="text"
+                    inputMode="numeric"
+                    className="field"
+                    placeholder={
+                      discountType ? "0" : "Pilih jenis diskon dulu"
+                    }
+                    value={discountDisplay}
+                    onChange={(event) => setDiscount(onlyNumber(event.target.value))}
+                    disabled={!discountType}
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label htmlFor="shipping" className="field-label">
+                    Biaya tambahan
+                  </label>
+                  <input
+                    id="shipping"
+                    type="text"
+                    inputMode="numeric"
+                    className="field"
+                    placeholder="Ongkir, pajak, atau biaya lain"
+                    value={shipping ? formatCurrency(shipping) : ""}
+                    onChange={(event) => setShipping(onlyNumber(event.target.value))}
+                  />
+                  <p className="mt-1 text-sm font-medium text-muted">
+                    Dibagi rata ke pembayar yang punya item.
+                  </p>
+                </div>
+              </div>
+
+              {discountValue > 0 || shippingValue > 0 ? (
+                <div className="mt-4 space-y-1 text-sm font-semibold text-muted">
+                  {discountValue > 0 ? (
+                    <p>Diskon: {formatCurrency(discountValue)}</p>
+                  ) : null}
+                  {shippingValue > 0 ? (
+                    <p>
+                      Biaya tambahan dibagi ke {activePayers.length} pembayar.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </Panel>
+          </div>
+
+          <div>
+            <ResultPanel
+              total={total}
+              finalTotal={finalTotal}
+              discountValue={discountValue}
+              shippingValue={shippingValue}
+              payerShares={payerShares}
+              error={validationError}
+              emptyMessage={emptyMessage}
+              formatCurrency={formatCurrency}
+              onCopy={handleCopy}
+              onShare={handleShare}
+              onRequestReset={requestReset}
+              onCancelReset={cancelReset}
+              onConfirmReset={confirmReset}
+              resetPending={resetPending}
+              status={status}
+              showConfetti={showConfetti}
+            />
+          </div>
+        </main>
+
+        <footer className="site-footer">
+          <p>
+            Dibuat oleh{" "}
+            <a
+              className="footer-link"
               href="https://github.com/zapip"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-bold text-orange-500"
             >
               Zapip
-            </Link>
-          </section>
+            </a>
+          </p>
+          <p className="text-xs">
+            Data hanya tersimpan di halaman ini. Memuat ulang halaman akan
+            mengosongkannya.
+          </p>
         </footer>
-      </article>
+      </div>
     </>
   );
 }

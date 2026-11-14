@@ -1,0 +1,113 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - heading "Split Bill" [level=1] [ref=e6]:
+        - generic [aria-hidden] [ref=e7]: SPLIT
+        - generic [aria-hidden] [ref=e8]: ÷
+      - paragraph [ref=e10]: BAGI TAGIHAN TANPA RIBET
+      - paragraph [ref=e11]: Isi teman, item, dan biaya tambahan. Pembagian dihitung langsung.
+    - main [ref=e12]:
+      - generic [ref=e13]:
+        - region "Pembayar" [ref=e14]:
+          - generic [ref=e15]:
+            - generic [aria-hidden] [ref=e16]: "01"
+            - generic [ref=e17]:
+              - heading "Pembayar" [level=2] [ref=e18]
+              - paragraph [ref=e19]: Tambahkan teman yang ikut patungan.
+          - generic [ref=e20]:
+            - generic [ref=e21]:
+              - generic [ref=e22]:
+                - generic [ref=e23] [cursor=pointer]: Nama teman
+                - textbox "Nama teman" [active] [ref=e24]:
+                  - /placeholder: Tulis nama teman
+              - button "Tambah teman" [disabled] [ref=e25]
+            - list "Daftar pembayar" [ref=e95]:
+              - listitem [ref=e96]:
+                - generic [ref=e97]:
+                  - generic [aria-hidden] [ref=e98]: BU
+                  - generic [ref=e99]: Budi
+                  - button "Hapus Budi" [ref=e100] [cursor=pointer]: ×
+              - listitem [ref=e101]:
+                - generic [ref=e102]:
+                  - generic [aria-hidden] [ref=e103]: SA
+                  - generic [ref=e104]: Sari
+                  - button "Hapus Sari" [ref=e105] [cursor=pointer]: ×
+              - listitem [ref=e106]:
+                - generic [ref=e107]:
+                  - generic [aria-hidden] [ref=e108]: AN
+                  - generic [ref=e109]: Andi
+                  - button "Hapus Andi" [ref=e110] [cursor=pointer]: ×
+        - region "Item" [ref=e28]:
+          - generic [ref=e29]:
+            - generic [aria-hidden] [ref=e30]: "02"
+            - generic [ref=e31]:
+              - heading "Item" [level=2] [ref=e32]
+              - paragraph [ref=e33]: Pilih pembayar tiap item. Ongkir dibagi rata ke pembayar yang punya item.
+          - generic [ref=e34]:
+            - generic [ref=e37]:
+              - generic [ref=e38]:
+                - paragraph [ref=e39]: Item 1
+                - button "Hapus item 1" [disabled] [ref=e40]: Hapus
+              - generic [ref=e41]:
+                - generic [ref=e42]:
+                  - generic [ref=e43] [cursor=pointer]: Pembayar
+                  - combobox "Pembayar" [ref=e44] [cursor=pointer]:
+                    - option "Pilih pembayar" [selected]
+                    - option "Budi"
+                    - option "Sari"
+                    - option "Andi"
+                - generic [ref=e45]:
+                  - generic [ref=e46] [cursor=pointer]: Nama item
+                  - textbox "Nama item" [disabled] [ref=e47]:
+                    - /placeholder: "Contoh: Nasi goreng"
+                - generic [ref=e48]:
+                  - generic [ref=e49] [cursor=pointer]: Harga
+                  - textbox "Harga" [disabled] [ref=e50]:
+                    - /placeholder: "0"
+              - paragraph [ref=e51]: Pilih pembayar dulu untuk mengisi item ini.
+            - button "Tambah item" [ref=e52] [cursor=pointer]
+        - region "Diskon dan biaya tambahan" [ref=e53]:
+          - generic [ref=e54]:
+            - generic [aria-hidden] [ref=e55]: "03"
+            - generic [ref=e56]:
+              - heading "Diskon dan biaya tambahan" [level=2] [ref=e57]
+              - paragraph [ref=e58]: Diskon mengurangi subtotal. Biaya tambahan dibagi rata.
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e62] [cursor=pointer]: Jenis diskon
+              - combobox "Jenis diskon" [ref=e63] [cursor=pointer]:
+                - option "Tanpa diskon" [selected]
+                - option "Nominal (Rp)"
+                - option "Persen (%)"
+            - generic [ref=e64]:
+              - generic [ref=e65] [cursor=pointer]: Nilai diskon
+              - textbox "Nilai diskon" [disabled] [ref=e66]:
+                - /placeholder: Pilih jenis diskon dulu
+            - generic [ref=e67]:
+              - generic [ref=e68] [cursor=pointer]: Biaya tambahan
+              - textbox "Biaya tambahan" [ref=e69]:
+                - /placeholder: Ongkir, pajak, atau biaya lain
+              - paragraph [ref=e70]: Dibagi rata ke pembayar yang punya item.
+      - region "Hasil" [ref=e72]:
+        - generic [ref=e73]:
+          - paragraph [ref=e74]: Total tagihan
+          - paragraph [ref=e75]: Rp 0
+          - generic [ref=e77]:
+            - generic [ref=e78]: Subtotal
+            - strong [ref=e79]: Rp 0
+        - generic [ref=e80]:
+          - heading "Hasil" [level=2] [ref=e81]
+          - generic [ref=e82]: 0 pembayar
+        - paragraph [ref=e84]: Isi minimal satu item dan pilih pembayar.
+        - generic [ref=e85]:
+          - button "Salin rincian" [disabled] [ref=e86]
+          - button "Bagikan rincian" [disabled] [ref=e87]
+          - button "Kosongkan semua" [ref=e88] [cursor=pointer]
+          - status [ref=e89]
+    - contentinfo [ref=e90]:
+      - paragraph [ref=e91]:
+        - text: Dibuat oleh
+        - link "Zapip" [ref=e92] [cursor=pointer]:
+          - /url: https://github.com/zapip
+      - paragraph [ref=e93]: Data hanya tersimpan di halaman ini. Memuat ulang halaman akan mengosongkannya.
+  - alert [ref=e94]
